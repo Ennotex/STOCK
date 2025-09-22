@@ -38,6 +38,8 @@
     .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px}
     .big{font-size:18px;font-weight:600}
     .check{font-size:48px;line-height:1}
+    .success{color:#d1fae5;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.25)}
+    .error{color:#fee2e2;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25)}
   </style>
 </head>
 <body>
@@ -48,7 +50,10 @@
           <h1>Gestion de stock</h1>
           <div class="sub" id="contextText">Chargement…</div>
         </div>
-        <div class="badge" id="rackBadge">RACK —</div>
+        <div class="row" style="gap:8px">
+          <div class="badge" id="rackBadge">RACK —</div>
+          <div class="badge" id="cellBadge" class="hidden">CELLULE —</div>
+        </div>
       </div>
 
       <div class="grid" id="idGrid">
@@ -83,6 +88,10 @@
 
       <div class="grid" style="margin-top:10px">
         <div>
+          <label for="cellule">Cellule (depuis QR)</label>
+          <input id="cellule" readonly placeholder="ex: C1 / Broderie / Prépa" />
+        </div>
+        <div>
           <label>Méthode</label>
           <div class="seg" role="tablist" id="modeSeg">
             <button type="button" data-mode="add" class="active">Ajouter</button>
@@ -90,228 +99,14 @@
             <button type="button" data-mode="set">Remplacer (stock exact)</button>
           </div>
         </div>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
         <div id="pinCol">
           <label for="pin">Code PIN (pour Remplacer)</label>
           <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="1312" />
         </div>
-      </div>
-
-      <div style="margin-top:10px">
-        <label for="qty">Quantité</label>
-        <div class="qty-row">
-            <button type="button" class="ghost" data-bump="-1">−</button>
-            <input id="qty" type="number" min="0" step="1" value="1" style="max-width:160px;text-align:center" />
-            <button type="button" class="ghost" data-bump="+1">+</button>
-        </div>
-      </div>
-
-      <div style="margin-top:10px">
-        <label for="note">Note (optionnel)</label>
-        <textarea id="note" rows="2" placeholder="Lot déballé, retour SAV, etc."></textarea>
-      </div>
-
-      <div class="footer">
-        <div class="small">Webhook: <span id="whHost">non défini</span></div>
-        <button id="submitBtn">Valider l'ajustement</button>
-      </div>
-
-      <div id="alert" class="badge hidden" style="margin-top:12px"></div>
-      <div class="footer">
-        <a class="link" href="#" id="resetLink">Scanner un autre QR</a>
-        <a class="link" target="_blank" rel="noreferrer" href="https://status.make.com/">Aide · Make Status</a>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ====== CONFIG ======
-    const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/akdf2h711fwq0vazi1tfr24rcysr51vs";
-    const PIN_CODE = "1312"; // requis uniquement pour mode 'set'
-
-    // ====== UTIL ======
-    const $ = (s)=>document.querySelector(s);
-    const params = new URLSearchParams(location.search);
-    const ctx = {
-      rack_id: params.get('rack') || '',
-      wh: params.get('wh') || MAKE_WEBHOOK_URL,
-      ref: params.get('ref') || '',
-      taille: params.get('taille') || params.get('size') || '',
-      couleur: params.get('couleur') || params.get('color') || '',
-      sku: params.get('sku') || '',
-      done: params.get('done') === '1'
-    };
-
-    function uuid(){
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
-        return v.toString(16);
-      });
-    }
-
-    function displayAlert(msg, type){
-      const el = $('#alert');
-      el.textContent = msg;
-      el.classList.remove('hidden');
-      el.classList.remove('success','error');
-      el.classList.add(type==='error'?'error':'success');
-    }
-
-    function composeSKU(){
-      if(ctx.sku) return ctx.sku;
-      const parts = [ctx.ref, ctx.couleur, ctx.taille].filter(Boolean);
-      return parts.join('-');
-    }
-
-    function updatePinVisibility(){
-      const mode = document.querySelector('.seg button.active').dataset.mode;
-      const pinCol = $('#pinCol');
-      if(mode === 'set'){ pinCol.classList.remove('hidden'); }
-      else { pinCol.classList.add('hidden'); }
-    }
-
-    function renderSuccess(){
-      const card = $('#cardRoot');
-      const data = JSON.parse(sessionStorage.getItem('last_op') || '{}');
-      card.innerHTML = `
-        <div class="center" style="min-height:260px">
-          <div class="check">✅</div>
-          <div class="big">Opération enregistrée</div>
-          <div class="sub">Merci ! Cette page évite les doubles envois.</div>
-          <div class="badge">${data.mode ? data.mode.toUpperCase() : ''} · ${data.qty||''} ${data.sku?('· '+data.sku):''}</div>
-          <div class="small">Rack: ${data.rack_id||'—'} · Opérateur: ${data.operator||'—'} · ${new Date().toLocaleString()}</div>
-          <div class="row" style="gap:10px;margin-top:10px">
-            <a class="link" href="${location.pathname}">Nouveau scan</a>
-            <button class="ghost" onclick="location.href='${location.pathname}'">Recommencer</button>
-          </div>
-        </div>
-      `;
-    }
-
-    // ====== INIT ======
-    (function init(){
-      if(ctx.done){ renderSuccess(); return; }
-
-      $('#rackBadge').textContent = ctx.rack_id ? `RACK ${ctx.rack_id}` : 'RACK —';
-      $('#whHost').textContent = new URL(ctx.wh).host;
-
-      // Prefill depuis QR (et vérouille)
-      if(ctx.ref) { $('#ref').value = ctx.ref; $('#ref').readOnly = true; }
-      if(ctx.taille) { $('#taille').value = ctx.taille; $('#taille').readOnly = true; }
-      if(ctx.couleur) { $('#couleur').value = ctx.couleur; $('#couleur').readOnly = true; }
-
-      // Opérateur local
-      const storedOp = localStorage.getItem('stockqr_operator');
-      if (storedOp) $('#operator').value = storedOp;
-
-      updateContextText();
-      updatePinVisibility();
-    })();
-
-    function updateContextText(){
-      const idTxt = [ctx.ref||$('#ref').value, ctx.taille||$('#taille').value, ctx.couleur||$('#couleur').value]
-        .filter(Boolean).join(' · ');
-      const base = ctx.rack_id?`Ajuster le stock pour le rack ${ctx.rack_id}`:'Ajuster le stock';
-      $('#contextText').textContent = idTxt?`${base} — ${idTxt}`:base;
-    }
-
-    // ====== MODE SWITCH ======
-    document.querySelectorAll('.seg button').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        updatePinVisibility();
-      });
-    });
-
-    // ====== QTY +/- ======
-    document.querySelectorAll('[data-bump]').forEach(b=>{
-      b.addEventListener('click',()=>{
-        const step = parseInt(b.getAttribute('data-bump'),10);
-        const v = parseInt($('#qty').value||'0',10);
-        const nv = Math.max(0, v + step);
-        $('#qty').value = nv;
-      });
-    });
-
-    // ====== RESET ======
-    $('#resetLink').addEventListener('click', (e)=>{
-      e.preventDefault();
-      location.href = location.pathname; // efface query → nouveau scan
-    });
-
-    // ====== SUBMIT ======
-    let submitting = false;
-    $('#submitBtn').addEventListener('click', async ()=>{
-      if(submitting) return;
-
-      const mode = document.querySelector('.seg button.active').dataset.mode; // add|remove|set
-      const qty = parseInt($('#qty').value||'0',10);
-      const ref = ctx.ref || ($('#ref').value||'').trim();
-      const taille = ctx.taille || ($('#taille').value||'').trim();
-      const couleur = ctx.couleur || ($('#couleur').value||'').trim();
-      const operator = ($('#operator').value||'').trim();
-      const note = ($('#note').value||'').trim();
-      const pin = ($('#pin').value||'').trim();
-
-      if(!operator){ displayAlert('Opérateur requis.', 'error'); return; }
-      if(!qty && mode!=='set'){ displayAlert('Quantité > 0 requise', 'error'); return; }
-      if(!(ref && taille && couleur) && !ctx.sku){
-        displayAlert('Réf + taille + couleur requis (ou SKU).', 'error'); return;
-      }
-      if(mode === 'set' && pin !== PIN_CODE){
-        displayAlert('PIN invalide. (Indice: 1312)', 'error'); return;
-      }
-
-      localStorage.setItem('stockqr_operator', operator);
-
-      const op_id = uuid();
-      const payload = {
-        op_id,
-        source:"qr-stock-ui",
-        rack_id: ctx.rack_id || null,
-        reference: ref || null,
-        taille: taille || null,
-        couleur: couleur || null,
-        sku: composeSKU() || null,
-        mode,
-        qty,
-        note: note || null,
-        operator: operator || null,
-        pin: mode==='set'? pin : null,
-        ts: new Date().toISOString(),
-        user_agent: navigator.userAgent,
-      };
-
-      const btn = $('#submitBtn');
-      btn.disabled = true; btn.textContent = 'Envoi…'; submitting = true;
-      try{
-        const res = await fetch(ctx.wh, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload),
-          mode: 'cors',
-          cache: 'no-store',
-        });
-        const ok = res.ok;
-        let msg = ok ? 'Stock mis à jour avec succès.' : `Erreur ${res.status}`;
-        try{ const j = await res.json(); if(j && j.message) msg = j.message; }catch{}
-        if(ok){
-          sessionStorage.setItem('last_op', JSON.stringify({
-            op_id, rack_id: ctx.rack_id, sku: payload.sku, mode, qty, operator
-          }));
-          const u = new URL(location.href);
-          u.search = 'done=1';
-          location.href = u.toString();
-        }else{
-          displayAlert(msg, 'error');
-        }
-      }catch(err){
-        console.error(err);
-        displayAlert('Erreur réseau. Vérifiez la connexion.', 'error');
-      }finally{
-        btn.disabled=false; btn.textContent='Valider l\'ajustement'; submitting = false;
-      }
-    });
-  </script>
-</body>
-</html>
+        <div>
+          <label for="qty">Quantité</label>
+          <div class="qty-row">
+            <button type=
