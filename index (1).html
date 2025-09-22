@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stock – Ajustement via QR</title>
+  <style>
+    :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--ok:#16a34a;--err:#ef4444;--accent:#60a5fa}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:radial-gradient(1200px 800px at 80% -10%,#172554,transparent),
+    linear-gradient(180deg,#0b1020,#020617);color:#e5e7eb;display:flex;align-items:center;justify-content:center}
+    .wrap{width:min(720px,92vw);}
+    .card{background:rgba(17,24,39,.75);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:20px 18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    h1{font-weight:700;font-size:22px;margin:0 0 6px}
+    .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    label{font-size:12px;color:#cbd5e1;display:block;margin-bottom:6px}
+    input,select,button,textarea{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#e5e7eb;padding:12px 12px;font-size:14px}
+    input[readonly]{opacity:.9}
+    input::placeholder,textarea::placeholder{color:#64748b}
+    button{cursor:pointer;border:none;background:linear-gradient(180deg,#2563eb,#1d4ed8)}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .row{display:flex;gap:8px;align-items:center}
+    .seg{display:flex;gap:8px}
+    .seg button{background:#0b1220;border:1px solid rgba(255,255,255,.12)}
+    .seg button.active{outline:2px solid var(--accent)}
+    .qty-row{display:flex;gap:8px}
+    .qty-row button{padding:10px 12px;min-width:64px;background:#0b1220;border:1px solid rgba(255,255,255,.12)}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:12px;color:#cbd5e1}
+    .muted{color:var(--muted)}
+    .success{color:#d1fae5;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.25)}
+    .error{color:#fee2e2;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25)}
+    .footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px}
+    .link{color:#93c5fd;text-decoration:none}
+    .help{font-size:12px;color:#93c5fd}
+    .hidden{display:none}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h1>Gestion de stock</h1>
+          <div class="sub" id="contextText">Chargement…</div>
+        </div>
+        <div class="badge" id="rackBadge">RACK —</div>
+      </div>
+
+      <div class="grid" id="idGrid">
+        <div>
+          <label for="ref">Référence</label>
+          <input id="ref" placeholder="ex: SOL'S-11380" />
+        </div>
+        <div>
+          <label for="taille">Taille</label>
+          <input id="taille" placeholder="ex: M" />
+        </div>
+      </div>
+
+      <div class="grid" id="colorOpGrid" style="margin-top:10px">
+        <div>
+          <label for="couleur">Couleur</label>
+          <input id="couleur" placeholder="ex: NOIR" />
+        </div>
+        <div>
+          <label for="operator">Opérateur</label>
+          <input id="operator" placeholder="Votre prénom" />
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
+        <div>
+          <label>Méthode</label>
+          <div class="seg" role="tablist">
+            <button type="button" data-mode="add" class="active">Ajouter</button>
+            <button type="button" data-mode="remove">Retirer</button>
+            <button type="button" data-mode="set">Remplacer (stock exact)</button>
+          </div>
+        </div>
+        <div>
+          <label for="pin">Code PIN (sécurité)</label>
+          <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="****" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label for="qty">Quantité</label>
+        <div class="qty-row">
+          <input id="qty" type="number" min="0" step="1" value="1" style="max-width:160px" />
+          <button type="button" data-bump="-10">-10</button>
+          <button type="button" data-bump="-5">-5</button>
+          <button type="button" data-bump="-1">-1</button>
+          <button type="button" data-bump="+1">+1</button>
+          <button type="button" data-bump="+5">+5</button>
+          <button type="button" data-bump="+10">+10</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label for="note">Note (optionnel)</label>
+        <textarea id="note" rows="2" placeholder="Lot déballé, retour SAV, etc."></textarea>
+      </div>
+
+      <div class="footer">
+        <div class="small muted">Webhook: <span id="whHost">non défini</span></div>
+        <button id="submitBtn">Valider l'ajustement</button>
+      </div>
+
+      <div id="alert" class="badge hidden" style="margin-top:12px"></div>
+      <div class="footer">
+        <a class="link" href="#" id="resetLink">Scanner un autre QR</a>
+        <a class="help" target="_blank" rel="noreferrer" href="https://status.make.com/">Aide · Make Status</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== CONFIG (à personnaliser) ======
+    const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/akdf2h711fwq0vazi1tfr24rcysr51vs"; // fourni par Brice
+    const REQUIRE_PIN = true; // bascule si vous ne voulez pas de PIN
+
+    // ====== UTIL ======
+    const $ = (s)=>document.querySelector(s);
+    const params = new URLSearchParams(location.search);
+    const ctx = {
+      rack_id: params.get('rack') || '',
+      wh: params.get('wh') || MAKE_WEBHOOK_URL,
+      // Identification article passée dans le QR
+      ref: params.get('ref') || '',
+      taille: params.get('taille') || params.get('size') || '',
+      couleur: params.get('couleur') || params.get('color') || '',
+      // rétro-compat SKU unique si jamais tu envoies "sku=" dans l'URL
+      sku: params.get('sku') || ''
+    };
+
+    function displayAlert(msg, type){
+      const el = $('#alert');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.classList.remove('success','error');
+      el.classList.add(type==='error'?'error':'success');
+    }
+
+    function composeSKU(){
+      if(ctx.sku) return ctx.sku;
+      const parts = [ctx.ref, ctx.couleur, ctx.taille].filter(Boolean);
+      return parts.join('-');
+    }
+
+    // ====== INIT ======
+    (function init(){
+      $('#rackBadge').textContent = ctx.rack_id ? `RACK ${ctx.rack_id}` : 'RACK —';
+      $('#whHost').textContent = new URL(ctx.wh).host;
+
+      // Prefill fields
+      if(ctx.ref) { $('#ref').value = ctx.ref; $('#ref').readOnly = true; }
+      if(ctx.taille) { $('#taille').value = ctx.taille; $('#taille').readOnly = true; }
+      if(ctx.couleur) { $('#couleur').value = ctx.couleur; $('#couleur').readOnly = true; }
+
+      const storedOp = localStorage.getItem('stockqr_operator');
+      if (storedOp) $('#operator').value = storedOp;
+      updateContextText();
+    })();
+
+    function updateContextText(){
+      const idTxt = [ctx.ref||$('#ref').value, ctx.taille||$('#taille').value, ctx.couleur||$('#couleur').value]
+        .filter(Boolean)
+        .join(' · ');
+      const base = ctx.rack_id?`Ajuster le stock pour le rack ${ctx.rack_id}`:'Ajuster le stock';
+      $('#contextText').textContent = idTxt?`${base} — ${idTxt}`:base;
+    }
+
+    // ====== MODE SWITCH ======
+    document.querySelectorAll('.seg button').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // ====== QTY BUMPS ======
+    document.querySelectorAll('[data-bump]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const step = parseInt(b.getAttribute('data-bump'),10);
+        const v = parseInt($('#qty').value||'0',10);
+        const nv = Math.max(0, v + step);
+        $('#qty').value = nv;
+      });
+    });
+
+    // ====== RESET (ex: après un scan) ======
+    $('#resetLink').addEventListener('click', (e)=>{
+      e.preventDefault();
+      const keep = ['wh'];
+      const np = new URLSearchParams();
+      for(const k of keep){ if(params.get(k)) np.set(k, params.get(k)); }
+      location.search = np.toString();
+    });
+
+    // ====== SUBMIT ======
+    $('#submitBtn').addEventListener('click', async ()=>{
+      const mode = document.querySelector('.seg button.active').dataset.mode; // add|remove|set
+      const qty = parseInt($('#qty').value||'0',10);
+
+      // Finalise ID depuis UI si pas dans l'URL
+      const ref = ctx.ref || ($('#ref').value||'').trim();
+      const taille = ctx.taille || ($('#taille').value||'').trim();
+      const couleur = ctx.couleur || ($('#couleur').value||'').trim();
+
+      const operator = ($('#operator').value||'').trim();
+      const note = ($('#note').value||'').trim();
+      const pin = ($('#pin').value||'').trim();
+
+      if(REQUIRE_PIN && !pin){ displayAlert('PIN requis', 'error'); return; }
+      if(!qty && mode!=='set'){ displayAlert('Quantité > 0 requise', 'error'); return; }
+      if(!(ref && taille && couleur) && !ctx.sku){
+        displayAlert('Réf + taille + couleur requis (ou SKU).', 'error');
+        return;
+      }
+
+      // persist operator locally
+      if(operator) localStorage.setItem('stockqr_operator', operator);
+
+      const payload = {
+        source:"qr-stock-ui",
+        rack_id: ctx.rack_id || null,
+        // Identification article
+        reference: ref || null,
+        taille: taille || null,
+        couleur: couleur || null,
+        sku: composeSKU() || null,
+        // Mouvement
+        mode, // add|remove|set
+        qty,  // entier
+        note: note || null,
+        operator: operator || null,
+        pin: pin || null,
+        ts: new Date().toISOString(),
+        user_agent: navigator.userAgent,
+      };
+
+      const btn = $('#submitBtn');
+      btn.disabled = true; btn.textContent = 'Envoi…';
+      try{
+        const res = await fetch(ctx.wh, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload),
+          mode: 'cors',
+          cache: 'no-store',
+        });
+        const ok = res.ok;
+        let msg = ok ? 'Stock mis à jour avec succès.' : `Erreur ${res.status}`;
+        try{ const j = await res.json(); if(j && j.message) msg = j.message; }catch{}
+        displayAlert(msg, ok?'success':'error');
+      }catch(err){
+        console.error(err);
+        displayAlert('Erreur réseau. Vérifiez la connexion.', 'error');
+      }finally{
+        btn.disabled=false; btn.textContent='Valider l\'ajustement';
+      }
+    });
+  </script>
+</body>
+</html>
