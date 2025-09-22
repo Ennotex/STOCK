@@ -2,111 +2,91 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Stock – Ajustement via QR</title>
+  <meta name="color-scheme" content="dark light">
   <style>
-    :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--accent:#60a5fa}
+    /* ---------- Base (mobile-first) ---------- */
+    *,*:before,*:after{box-sizing:border-box}
+    :root{--bg:#0b1020;--panel:#121826;--muted:#94a3b8;--ink:#e5e7eb;--line:rgba(255,255,255,.12);--accent:#60a5fa}
     html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;
-         background:radial-gradient(1200px 800px at 80% -10%,#172554,transparent),
-         linear-gradient(180deg,#0b1020,#020617);color:#e5e7eb;display:flex;align-items:center;justify-content:center}
-    .wrap{width:min(720px,92vw);}
-    .card{background:rgba(17,24,39,.75);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.06);
-          border-radius:18px;padding:20px 18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-    h1{font-weight:700;font-size:22px;margin:0 0 6px}
-    .sub{color:#94a3b8;font-size:13px;margin-bottom:14px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    label{font-size:12px;color:#cbd5e1;display:block;margin-bottom:6px}
-    input,button,textarea,select{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.12);
-          background:#0b1220;color:#e5e7eb;padding:12px 12px;font-size:14px}
+         background:linear-gradient(180deg,#0b1020,#020617);
+         color:var(--ink);-webkit-tap-highlight-color:transparent}
+    .wrap{max-width:560px;margin:env(safe-area-inset-top) auto env(safe-area-inset-bottom);
+          padding:16px}
+    .card{background:rgba(18,24,38,.88);backdrop-filter:blur(10px);
+          border:1px solid var(--line);border-radius:16px;padding:16px}
+    h1{font-size:20px;margin:0 0 4px}
+    .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+    label{display:block;font-size:12px;color:#cbd5e1;margin:10px 0 6px}
+    input,textarea,button,select{width:100%;padding:12px;border-radius:12px;
+      border:1px solid var(--line);background:#0b1220;color:var(--ink);font-size:15px}
     input[readonly]{opacity:.9}
-    button{cursor:pointer;border:none;background:linear-gradient(180deg,#2563eb,#1d4ed8)}
-    button.ghost{background:#0b1220;border:1px solid rgba(255,255,255,.12)}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .row{display:flex;gap:8px;align-items:center}
-    .seg{display:flex;gap:8px}
-    .seg button{background:#0b1220;border:1px solid rgba(255,255,255,.12)}
-    .seg button.active{outline:2px solid var(--accent)}
-    .qty-row{display:flex;gap:8px;align-items:center}
-    .qty-row button{padding:10px 12px;min-width:48px;background:#0b1220;border:1px solid rgba(255,255,255,.12)}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);
-           font-size:12px;color:#cbd5e1}
-    .footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px}
-    .link{color:#93c5fd;text-decoration:none}
+    textarea{resize:vertical;min-height:72px}
+    .row{display:flex;align-items:center;gap:8px}
+    .between{justify-content:space-between}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);font-size:12px;color:#cbd5e1}
+    .muted{color:var(--muted)}
     .hidden{display:none}
-    .small{font-size:12px;color:#94a3b8}
-    .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px}
-    .big{font-size:18px;font-weight:600}
-    .check{font-size:48px;line-height:1}
-    .success{color:#d1fae5;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.25)}
-    .error{color:#fee2e2;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25)}
+    .grid{display:grid;gap:10px}
+    .grid-2{grid-template-columns:1fr}
+    @media (min-width:640px){.grid-2{grid-template-columns:1fr 1fr}}
+    /* ---------- Segmented control ---------- */
+    .seg{display:flex;gap:8px}
+    .seg button{flex:1;background:#0b1220;border:1px solid var(--line);padding:12px;border-radius:12px}
+    .seg button.active{outline:2px solid var(--accent)}
+    /* ---------- Qty stepper ---------- */
+    .qty{display:flex;align-items:center;gap:8px}
+    .qty button{width:56px;min-height:48px;background:#0b1220;border:1px solid var(--line)}
+    .qty input{text-align:center;max-width:140px}
+    /* ---------- Footer ---------- */
+    .footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
+    .link{color:#93c5fd;text-decoration:none}
+    .alert{margin-top:12px}
+    .alert.ok{color:#d1fae5;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.25)}
+    .alert.err{color:#fee2e2;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25)}
+    button:disabled{opacity:.6}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card" id="cardRoot">
-      <div class="row" style="justify-content:space-between">
+    <div class="card" id="card">
+      <div class="row between">
         <div>
           <h1>Gestion de stock</h1>
-          <div class="sub" id="contextText">Chargement…</div>
+          <p class="sub" id="context">Chargement…</p>
         </div>
-        <div class="row" style="gap:8px">
-          <div class="badge" id="rackBadge">RACK —</div>
-          <div class="badge" id="cellBadge" class="hidden">CELLULE —</div>
+        <div class="row">
+          <span class="badge" id="rackBadge">RACK —</span>
+          <span class="badge hidden" id="cellBadge">CELLULE —</span>
         </div>
       </div>
 
-      <div class="grid" id="idGrid">
+      <!-- Identité article -->
+      <div class="grid grid-2">
         <div>
           <label for="ref">Référence</label>
-          <input id="ref" placeholder="ex: SOL'S-11380" />
+          <input id="ref" placeholder="ex: SOL'S-11380">
         </div>
         <div>
           <label for="taille">Taille</label>
-          <input id="taille" placeholder="ex: M" />
+          <input id="taille" placeholder="ex: M">
         </div>
       </div>
 
-      <div class="grid" id="colorOpGrid" style="margin-top:10px">
+      <div class="grid grid-2">
         <div>
           <label for="couleur">Couleur</label>
-          <input id="couleur" placeholder="ex: NOIR" />
+          <input id="couleur" placeholder="ex: NOIR">
         </div>
         <div>
           <label for="operator">Opérateur (obligatoire)</label>
-          <input id="operator" list="operatorsList" placeholder="Sélectionner ou taper votre prénom" />
+          <input id="operator" list="operatorsList" placeholder="Sélectionner ou taper votre prénom">
           <datalist id="operatorsList">
             <option value="Téo"></option>
             <option value="Elodie"></option>
             <option value="Candice"></option>
             <option value="Anthony"></option>
             <option value="Léo"></option>
-            <option value="Brice"></option>
-          </datalist>
-        </div>
-      </div>
-
-      <div class="grid" style="margin-top:10px">
-        <div>
-          <label for="cellule">Cellule (depuis QR)</label>
-          <input id="cellule" readonly placeholder="ex: C1 / Broderie / Prépa" />
-        </div>
-        <div>
-          <label>Méthode</label>
-          <div class="seg" role="tablist" id="modeSeg">
-            <button type="button" data-mode="add" class="active">Ajouter</button>
-            <button type="button" data-mode="remove">Retirer</button>
-            <button type="button" data-mode="set">Remplacer (stock exact)</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid" style="margin-top:10px">
-        <div id="pinCol">
-          <label for="pin">Code PIN (pour Remplacer)</label>
-          <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="1312" />
-        </div>
-        <div>
-          <label for="qty">Quantité</label>
-          <div class="qty-row">
-            <button type=
+            <option value="B
